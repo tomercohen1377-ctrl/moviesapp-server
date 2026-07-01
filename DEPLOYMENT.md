@@ -6,6 +6,13 @@ in this repo onto the public internet. No AWS account, no IAM, no DNS.
 Time: **~30 minutes** the first time, ~2 minutes for subsequent deploys.
 Cost: **~$1-2/month** for the app + Postgres at idle (free trial credits apply).
 
+> 🟢 **Live deployment (this repo):** <https://moviesapp-server-production.up.railway.app>
+>
+> **Smoke-tested on 2026-07-01**:
+> - `GET /actuator/health` → `HTTP 200 {"status":"UP"}`
+> - `POST /users/me/favorites/550` → `HTTP 201 {"created":true}`
+> - `GET /users/me/favorites` → `HTTP 200 [{\"movieId\":550,…}]`
+
 ---
 
 ## 1. Prerequisites (already satisfied for this repo)

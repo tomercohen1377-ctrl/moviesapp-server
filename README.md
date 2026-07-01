@@ -4,11 +4,17 @@ Standalone Spring Boot 3.3 backend for the [Movies-App Android client](https://g
 Extracted from the multi-module `:server` subproject into its own repo so it
 opens directly in IntelliJ without the Android toolchain noise.
 
+> 🟢 **Live:** <https://moviesapp-server-production.up.railway.app/actuator/health> — `{"status":"UP"}`
+>
+> **Smoke-tested end-to-end on 2026-07-01**: `/actuator/health` ✅,
+> authed `GET /users/me/favorites` ✅, `POST /users/me/favorites/550` → `201`,
+> follow-up `GET` returns the persisted favorite ✅.
+
 | Title | Link |
 | --- | --- |
 | Local quick start | [below](#quick-start) |
 | HTTP surface | [below](#http-surface) |
-| Deploy to **Railway** (free) | [DEPLOYMENT.md](DEPLOYMENT.md) |
+| Deploy to **Railway** (live) | [DEPLOYMENT.md](DEPLOYMENT.md) |
 | Full multi-host comparison | [`docs/AWS_DEPLOYMENT_PLAN.md`](docs/AWS_DEPLOYMENT_PLAN.md) |
 
 > **Status:** production-deployed via Railway. The AWS playbook in
@@ -172,9 +178,19 @@ and [`docs/AWS_DEPLOYMENT_PLAN.md`](docs/AWS_DEPLOYMENT_PLAN.md) for AWS.
 
 1. **Phase 1** ✅ Postgres + Flyway (schema migrations via `V1__*.sql`).
 2. **Phase 2** ✅ Production-grade Dockerfile (non-root, JVM, healthcheck).
-3. **Phase 3** ✅ Railway deploy (or AWS App Runner — see the plan).
+3. **Phase 3** ✅ Railway deploy — **live at <https://moviesapp-server-production.up.railway.app>**.
 4. **Phase 4** ⏳ GitHub Actions CI (`.github/workflows/test.yml`).
 5. **Phase 5** ⏳ Structured logging + request metrics.
+
+## Resume bullet (suggested)
+
+```
+Movies-app backend (Spring Boot 3.3, Kotlin, PostgreSQL, Docker) — movie-favorites
+API live at https://moviesapp-server-production.up.railway.app; Flyway-managed
+schema migrations, multi-stage Docker image running as non-root, API-key auth,
+and continuous deployment from `tomercohen1377-ctrl/moviesapp-server`. Endpoints:
+/actuator/health (open), /users/{userId}/favorites… (X-Api-Key).
+```
 
 ## Decisions worth noting
 
