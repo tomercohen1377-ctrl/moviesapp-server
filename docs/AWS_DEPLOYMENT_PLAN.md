@@ -1,13 +1,34 @@
-# `:server` → AWS — full deployment playbook
+# `:server` deployment playbook
 
 A concrete, sequenced plan for turning the Spring Boot service in `:server`
-into a fully working **remote backend for the Android `:app`**, hosted on
-**AWS** with **Docker**, with real authentication, persistence, CI/CD,
-and observability.
+into a fully working **remote backend for the Android `:app`**, packaged with
+Docker, with real authentication, persistence, CI/CD, and observability.
 
 > **Audience:** you, in a weekend or two of focused work. This doc assumes
 > the contents of [`docs/SERVER.md`](SERVER.md) — the local `:server`
-> module is working and its 7 tests pass green.
+> module is working and its tests pass green.
+
+## Which host should I pick?
+
+| Path                | Complexity | Cost (idle)  | When to pick                                     |
+| ------------------- | ---------- | ------------ | ------------------------------------------------ |
+| **Railway** (live)  | Low        | ~$1-2/mo     | First deploy. One-click Postgres, free TLS, GitHub push-to-deploy. **Currently live for this repo — see [`DEPLOYMENT.md`](../DEPLOYMENT.md).** |
+| **Fly.io**          | Low        | ~$0-2/mo     | Global edge regions, Dockerfiles, free Postgres.|
+| **AWS (App Runner + RDS)** | Medium | ~$25-40/mo | Showcases full AWS story on a resume.       |
+| **AWS (ECS + ALB + CloudFront)** | High | ~$35-60/mo | Production-grade scale, blue-green deploys. |
+
+**Recommendation:** start with **Railway** ([`DEPLOYMENT.md`](../DEPLOYMENT.md))
+to get a live URL on a weekend. **Read the AWS path below** when you want
+the resume-grade breadth of services that AWS demonstrates.
+
+Phase 1 and Phase 2 below are **already complete in this repo** —
+Flyway migrations, the production-grade `Dockerfile`, API-key auth, and
+container healthcheck are all in place regardless of host.
+
+> 🟢 **Current live deploy: Railway.** Follow [`DEPLOYMENT.md`](../DEPLOYMENT.md)
+> to push updates. The AWS plan below is preserved as the resume-grade
+> alternative — pick this when you want to demonstrate full AWS breadth.
+> Railway deploy config: [`railway.json`](../railway.json).
 
 ---
 
@@ -87,10 +108,11 @@ Always-on, **after** AWS Free Tier expires (12 months for new accounts):
 
 ---
 
-## Phase 1 — Production-ready `:server`
+## Phase 1 — Production-ready `:server` ✅ done in this repo
 
 *Goal: replace H2 + `ddl-auto=create-drop` with durable schema that survives
-container restarts.*
+container restarts. **Already implemented in this repo** — see
+[`src/main/resources/db/migration/V1__create_favorites.sql`](../src/main/resources/db/migration/V1__create_favorites.sql).*
 
 ### Changes inside `server/`
 
@@ -149,7 +171,12 @@ SPRING_PROFILES_ACTIVE=dev ./gradlew :server:bootRun
 
 ---
 
-## Phase 2 — Production-grade Dockerfile
+## Phase 2 — Production-grade Dockerfile ✅ done in this repo
+
+The current [`Dockerfile`](../Dockerfile) **already** uses `:jdk-jammy` for
+build, `:jre-jammy` for runtime, runs as non-root user `app` (uid 1001), and
+hits `/actuator/health` every 30s. Same shape as the spec below — kept here
+for reference only.
 
 The `server/Dockerfile` from earlier works for local dev. For prod:
 

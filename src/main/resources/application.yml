@@ -23,7 +23,8 @@ spring:
     default-property-inclusion: non_null
 
 server:
-  port: 8080
+  # Railway / Fly / Render all inject PORT. Default to 8080 for local.
+  port: ${PORT:8080}
 
 management:
   endpoints:
