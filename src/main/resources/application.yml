@@ -1,0 +1,75 @@
+spring:
+  application:
+    name: moviesapp-server
+  datasource:
+    # Default profile = local/dev-friendly H2 in PostgreSQL compatibility mode.
+    # Production overrides this with SPRING_DATASOURCE_* environment variables.
+    url: jdbc:h2:mem:movies_app;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  flyway:
+    enabled: true
+  jpa:
+    # Flyway owns schema creation. Hibernate only validates that entities and
+    # database tables match, which prevents accidental production schema drift.
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.format_sql: true
+      hibernate.show_sql: false
+    open-in-view: false
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: moviesapp-server
+    description: Spring Boot backend for Movies-App favorites
+
+# Custom config namespace — read by ApiKeyAuthFilter.
+api:
+  # Empty default = every authenticated request gets 401. The hosting platform's
+  # API_KEY env var is mapped in here by Spring's relaxed binding.
+  key: ${API_KEY:}
+
+logging:
+  level:
+    org.hibernate.SQL: info
+    com.tcohen.moviesapp.server: debug
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+logging:
+  level:
+    org.hibernate.SQL: warn
+    com.tcohen.moviesapp.server: info

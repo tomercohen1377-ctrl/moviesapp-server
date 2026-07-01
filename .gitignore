@@ -1,0 +1,34 @@
+# Gradle wrapper outputs (the wrapper itself is committed)
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Eclipse / VS Code
+.project
+.classpath
+.settings/
+.vscode/
+
+# Local config with secrets — never commit
+local.properties
+**/application-local.yml
+**/application-local.yaml
+
+# OS dotfiles
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# IDE caches — IntelliJ indexing scratch
+**/caches/
