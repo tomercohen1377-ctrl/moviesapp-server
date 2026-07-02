@@ -104,4 +104,15 @@ class AuthController(
             .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
             .body(ErrorBody(message))
     }
+
+    /**
+     * Catch-all so request-validation failures don't degrade into generic
+     * Spring Boot problem-detail JSON. Lets us return our `ErrorBody` shape.
+     */
+    @org.springframework.web.bind.annotation.ExceptionHandler(Exception::class)
+    fun handle(e: Exception): ResponseEntity<Any> {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+            .body(ErrorBody("Unexpected error: ${e.javaClass.simpleName}: ${e.message ?: "<none>"}"))
+    }
 }
