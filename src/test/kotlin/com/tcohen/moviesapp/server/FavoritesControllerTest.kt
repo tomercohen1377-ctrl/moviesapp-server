@@ -52,11 +52,10 @@ class FavoritesControllerTest {
         jdbc.update("DELETE FROM favorites")
         jdbc.update("DELETE FROM users")
         // Bootstrap a user before each test so we always start clean.
-        val body = mapper.writeValueAsString(
-            mapOf("userId" to "u-bootstrap", "password" to "test-pass-1234"),
-        )
         val tokenJson = mockMvc.perform(
-            post("/auth/register").contentType("application/json").content(body),
+            post("/auth/register")
+                .header("X-User-Id", "u-bootstrap")
+                .header("X-Password", "test-pass-1234"),
         ).andExpect(status().isOk).andReturn().response.contentAsString
         token = mapper.readTree(tokenJson).get("accessToken").asText()
     }

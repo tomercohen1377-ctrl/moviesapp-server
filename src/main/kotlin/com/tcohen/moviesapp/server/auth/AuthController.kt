@@ -2,14 +2,13 @@ package com.tcohen.moviesapp.server.auth
 
 import com.tcohen.moviesapp.server.favorites.ErrorBody
 import jakarta.servlet.http.HttpServletRequest
-import kotlinx.serialization.Serializable
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
-import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
@@ -35,33 +34,52 @@ class AuthController(
     private val jwt: JwtService,
 ) {
 
-    @Serializable
-    data class Credentials(val userId: String, val password: String)
-
-    @Serializable
+    /**
+     * Bearer-token response shape, made a static class so it survives
+     * wiring changes regardless of which JSON converter Spring uses.
+     */
     data class TokenResponse(
         val accessToken: String,
         val tokenType: String = "Bearer",
     )
 
-    @Serializable
     data class WhoAmIResponse(val userId: String)
 
     @PostMapping("/register")
-    fun register(@RequestBody creds: Credentials): ResponseEntity<Any> =
-        auth.register(creds.userId, creds.password)
-            .fold(
-                onSuccess = { ResponseEntity.ok(TokenResponse(accessToken = it)) },
-                onFailure = { errorBody(it) },
-            )
+    fun register(
+        @RequestHeader("X-User-Id") userId: String?,
+        @RequestHeader("X-Password") password: String?,
+    ): ResponseEntity<Any> = performRegister(userId, password)
 
     @PostMapping("/token")
-    fun token(@RequestBody creds: Credentials): ResponseEntity<Any> =
-        auth.login(creds.userId, creds.password)
+    fun token(
+        @RequestHeader("X-User-Id") userId: String?,
+        @RequestHeader("X-Password") password: String?,
+    ): ResponseEntity<Any> = performLogin(userId, password)
+
+    private fun performRegister(userId: String?, password: String?): ResponseEntity<Any> {
+        if (userId.isNullOrBlank() || password == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ErrorBody("X-User-Id and X-Password headers required"))
+        }
+        return auth.register(userId, password)
             .fold(
                 onSuccess = { ResponseEntity.ok(TokenResponse(accessToken = it)) },
                 onFailure = { errorBody(it) },
             )
+    }
+
+    private fun performLogin(userId: String?, password: String?): ResponseEntity<Any> {
+        if (userId.isNullOrBlank() || password == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ErrorBody("X-User-Id and X-Password headers required"))
+        }
+        return auth.login(userId, password)
+            .fold(
+                onSuccess = { ResponseEntity.ok(TokenResponse(accessToken = it)) },
+                onFailure = { errorBody(it) },
+            )
+    }
 
     @GetMapping("/jwks.json", produces = ["application/json"])
     fun jwks(): Map<String, Any?> = mapOf("keys" to listOf(jwt.jwk()))
