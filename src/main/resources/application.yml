@@ -45,11 +45,15 @@ info:
     name: moviesapp-server
     description: Spring Boot backend for Movies-App favorites
 
-# Custom config namespace — read by ApiKeyAuthFilter.
-api:
-  # Empty default = every authenticated request gets 401. The hosting platform's
-  # API_KEY env var is mapped in here by Spring's relaxed binding.
-  key: ${API_KEY:}
+# JWT bearer-token auth — see AuthController and JwtAuthFilter.
+jwt:
+  issuer: moviesapp-server
+  # Default TTL is 24 hours. Production should set JWT_TTL_SECONDS lower
+  # (e.g. 3600) so a stolen device only exposes one hour of tokens.
+  ttl-seconds: ${JWT_TTL_SECONDS:86400}
+  # Production: paste base64url-encoded PKCS#8 RSA private key here.
+  private-key: ${JWT_PRIVATE_KEY:}
+  public-key: ${JWT_PUBLIC_KEY:}
 
 logging:
   level:

@@ -136,13 +136,29 @@ app still starts if you're testing locally.
 > "one deployment file = one URL" experience. Option A is the most explicit
 > and least likely to confuse a reviewer.
 
-## 7. Set the `API_KEY` and profile
+## 7. Set bcrypt-friendly environment variables
 
-Generate a strong key locally (`openssl rand -hex 32`), then:
+The server uses bearer tokens now — there's no shared `API_KEY` to distribute
+to the Android client. **After deploying, register a user once**:
 
 ```powershell
-railway variables --set "SPRING_PROFILES_ACTIVE=prod"
-railway variables --set "API_KEY=<paste-the-key-here>"
+curl -X POST https://<your-domain>/auth/register \
+     -H "Content-Type: application/json" \
+     -d '{"userId":"you","password":"your-password-1234"}'
+# → {"accessToken":"eyJ…","tokenType":"Bearer"}
+```
+
+Save the `accessToken` somewhere safe. The Android client stores it in
+`EncryptedSharedPreferences` and re-uses it until it expires (default 24 h),
+then calls `/auth/token` to get a fresh one.
+
+**Optional production hardening**:
+
+```powershell
+# Pin the JWT signing keys so tokens survive deploys/restarts.
+railway variables --set "JWT_TTL_SECONDS=3600"   # 1 h
+railway variables --set "JWT_PRIVATE_KEY=<base64-PKCS8-RSA-private-key>"
+railway variables --set "JWT_PUBLIC_KEY=<base64-X509-RSA-public-key>"
 ```
 
 (Optional) set a Customer-facing domain-friendly HTTP base for the Android app:
@@ -184,17 +200,24 @@ Railway assigns a free `*.up.railway.app` subdomain and shows you the URL.
 Wait ~30 seconds after `railway up` returned `Successful`, then:
 
 ```powershell
-curl https://<your-railway-domain>/actuator/health
+& 'C:\Windows\System32\curl.exe' https://<your-railway-domain>/actuator/health
 # → {"status":"UP"}
 
-curl -H "X-Api-Key: <your-api-key>" `
-     https://<your-railway-domain>/users/me/favorites
+# Register a user, capture the JWT, hit a protected endpoint.
+$resp = & 'C:\Windows\System32\curl.exe' -sS -X POST `
+   https://<your-railway-domain>/auth/register `
+   -H 'Content-Type: application/json' `
+   -d '{"userId":"smoke","password":"smoke-test-1234"}'
+$token = ($resp | ConvertFrom-Json).accessToken
+
+& 'C:\Windows\System32\curl.exe' -sS -H "Authorization: Bearer $token" `
+   https://<your-railway-domain>/users/me/favorites
 # → []
 ```
 
-If you see **401** on the second call → your `API_KEY` doesn't match the one
-in Railway variables. Edit it via `railway variables --set "API_KEY=…"` and
-re-trigger a deploy.
+If you see **401 "Invalid or expired token"** → your registered as a different
+user than the one you're calling `/users/.../favorites` with. JWTs are tied to
+the user that requested them.
 
 ## 11. Continuous deploy from GitHub
 

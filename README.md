@@ -98,31 +98,45 @@ curl -H "X-Api-Key: $API_KEY" https://<your-domain>/users/me/favorites
 
 ## HTTP surface
 
+### Auth (open)
+
+| Method | Path                | Auth | Returns                              |
+| ------ | ------------------- | ---- | ------------------------------------ |
+| POST   | `/auth/register`    | No   | `200 { accessToken, tokenType }` |
+| POST   | `/auth/token`       | No   | `200 { accessToken, tokenType }` |
+| GET    | `/auth/jwks.json`   | No   | `200 { keys: [jwk] }`             |
+| GET    | `/auth/whoami`      | Yes  | `200 { userId }`                  |
+| GET    | `/health`           | No   | `200 { "status": "ok" }`         |
+| GET    | `/actuator/health`  | No   | `200 { "status": "UP" }`         |
+
+### Favorites
+
 | Method | Path                                  | Auth | Returns                                                   |
 | ------ | ------------------------------------- | ---- | --------------------------------------------------------- |
-| GET    | `/health`                             | No   | `200 { "status": "ok" }`                               |
-| GET    | `/actuator/health`                    | No   | `200 { "status": "UP" }`                               |
 | GET    | `/users/{userId}/favorites`           | Yes  | `200 List<FavoriteDto>` (savedAt DESC)                    |
 | GET    | `/users/{userId}/favorites/{movieId}` | Yes  | `200 { isFavorite }` / `404`                              |
 | POST   | `/users/{userId}/favorites/{movieId}` | Yes  | `201 { created: true }` if new / `200` if already there   |
 | DELETE | `/users/{userId}/favorites/{movieId}` | Yes  | `204` / `404`                                             |
 
-Auth = `X-Api-Key: <API_KEY>` header. The `ApiKeyAuthFilter` short-circuits
-to `401` for any path other than `/health` and `/actuator/health`.
+Auth = `Authorization: Bearer <jwt>` header on `/auth/whoami` and on every
+favorites endpoint. Tokens are RS256-signed JWTs, 24 h TTL by default. The
+`JwtAuthFilter` short-circuits to `401` for any non-open path with a missing
+or invalid token.
 
 ### Configuration
 
-| Env var                         | Default                             | Purpose                                      |
-| ------------------------------- | ----------------------------------- | -------------------------------------------- |
-| `API_KEY`                       | `""` (rejects every authed request) | Expected `X-Api-Key` header value            |
-| `PORT`                          | `8080`                              | HTTP port (Railway/Render/Heroku inject this) |
-| `SERVER_PORT`                   | `8080`                              | HTTP port (Spring Boot built-in)             |
-| `SPRING_PROFILES_ACTIVE`        | unset (uses H2 default)             | Set `prod` for Postgres + production logging |
-| `SPRING_DATASOURCE_URL`         | H2 in-memory                        | Set to `jdbc:postgresql://…` in production   |
-| `SPRING_DATASOURCE_USERNAME`    | `sa`                                | DB username                                  |
-| `SPRING_DATASOURCE_PASSWORD`    | `""`                                | DB password                                  |
-| `DATABASE_URL`                  | unset                               | Railway PostgreSQL plugin sets this — Spring needs the four `SPRING_DATASOURCE_*` above or a connector expects it |
-| `SPRING_JPA_HIBERNATE_DDL_AUTO` | `validate`                          | Hibernate validates Flyway-managed schema    |
+| Env var                         | Default                                   | Purpose                                       |
+| ------------------------------- | ----------------------------------------- | --------------------------------------------- |
+| `PORT`                          | `8080`                                    | HTTP port (Railway/Render/Heroku inject this) |
+| `SERVER_PORT`                   | `8080`                                    | HTTP port (Spring Boot built-in)              |
+| `SPRING_PROFILES_ACTIVE`        | unset (uses H2 default)                   | Set `prod` for Postgres + production logging  |
+| `SPRING_DATASOURCE_URL`         | H2 in-memory                              | Set to `jdbc:postgresql://…` in production    |
+| `SPRING_DATASOURCE_USERNAME`    | `sa`                                      | DB username                                   |
+| `SPRING_DATASOURCE_PASSWORD`    | `""`                                      | DB password                                   |
+| `JWT_TTL_SECONDS`               | `86400` (24 h)                            | Bearer token lifetime                         |
+| `JWT_PRIVATE_KEY`               | unset (auto RSA per JVM)                  | Base64 PKCS#8 — sticky across deploys         |
+| `JWT_PUBLIC_KEY`                | unset (auto RSA per JVM)                  | Base64 X.509 — published at `/auth/jwks.json` |
+| `SPRING_JPA_HIBERNATE_DDL_AUTO` | `validate`                                | Hibernate validates Flyway-managed schema     |
 
 > Railway's Postgres plugin injects `DATABASE_URL` like
 > `postgresql://user:pwd@host:port/railway`. Spring Boot **does not** read
@@ -134,20 +148,30 @@ to `401` for any path other than `/health` and `/actuator/health`.
 
 ```
 src/main/kotlin/com/tcohen/moviesapp/server/
-├── ServerApplication.kt   # @SpringBootApplication entry point
+├── ServerApplication.kt       # @SpringBootApplication entry point
 ├── favorites/
-│   ├── Favorite.kt        # @Entity — JPA, composite key, idempotency-friendly
-│   ├── FavoriteDto.kt     # wire DTOs (@Serializable)
-│   ├── FavoritesRepository.kt  # JpaRepository — derived query methods
+│   ├── Favorite.kt            # @Entity — JPA, composite key, idempotency-friendly
+│   ├── FavoriteDto.kt         # wire DTOs (@Serializable)
+│   ├── FavoritesRepository.kt # JpaRepository — derived query methods
 │   ├── FavoritesService.kt    # @Service — business logic
 │   └── FavoritesController.kt # @RestController
+├── auth/
+│   ├── User.kt                # @Entity — registered end users
+│   ├── UsersRepository.kt     # JpaRepository
+│   ├── AuthService.kt         # register / login + BCrypt + JWT minting
+│   ├── AuthController.kt      # /auth/register, /auth/token, /auth/jwks.json
+│   └── JwtService.kt          # RS256 sign + verify, key load
 ├── health/HealthController.kt
-└── security/ApiKeyAuthFilter.kt
+└── security/
+    ├── JwtAuthFilter.kt       # Bearer token validation
+    └── SecurityConfig.kt      # Spring Security chain (stateless, no Basic)
 src/main/resources/
 ├── application.yml
 ├── logback-spring.xml
-└── db/migration/V1__create_favorites.sql
-src/test/kotlin/.../FavoritesControllerTest.kt   # MockMvc, real Spring, H2
+└── db/migration/
+    ├── V1__create_favorites.sql
+    └── V2__create_users.sql
+src/test/kotlin/.../ — FavoritesControllerTest, AuthControllerTest
 
 # Deployment
 Dockerfile                # multi-stage JRE image, non-root
@@ -187,9 +211,10 @@ and [`docs/AWS_DEPLOYMENT_PLAN.md`](docs/AWS_DEPLOYMENT_PLAN.md) for AWS.
 ```
 Movies-app backend (Spring Boot 3.3, Kotlin, PostgreSQL, Docker) — movie-favorites
 API live at https://moviesapp-server-production.up.railway.app; Flyway-managed
-schema migrations, multi-stage Docker image running as non-root, API-key auth,
-and continuous deployment from `tomercohen1377-ctrl/moviesapp-server`. Endpoints:
-/actuator/health (open), /users/{userId}/favorites… (X-Api-Key).
+schema migrations, multi-stage Docker image running as non-root, RS256 JWT
+authentication with /auth/{register,token,jwks.json}, and continuous deployment
+from `tomercohen1377-ctrl/moviesapp-server`. Endpoints: /actuator/health (open),
+/users/{userId}/favorites… (Authorization: Bearer <jwt>).
 ```
 
 ## Decisions worth noting
@@ -197,9 +222,10 @@ and continuous deployment from `tomercohen1377-ctrl/moviesapp-server`. Endpoints
 - **Spring Data JPA, not raw JDBC.** Derived query methods (e.g.
   `deleteByUserIdAndMovieId(...)`) cut a few dozen lines per resource and
   make the data layer legible to reviewers who don't speak SQL.
-- **API-key auth, not JWT.** Single shared secret for v1. JWT adds
-  rotation, scopes, and `exp` validation — worth the complexity only when
-  the user count grows past "me and the Android app."
+- **Bearer token (RS256 JWT), not API-key.** Per-user identity, expiry, and
+  future scopes. The verification filter is a single servlet filter; the
+  issuing endpoint (`/auth/token`) uses the same JJWT library, so adding
+  refresh tokens or rotating keys is a one-line change.
 - **H2 with `MODE=PostgreSQL` for dev.** Same DDL works against Postgres
   in prod — only the JDBC URL changes.
 - **`railway.json` over `railway.toml`.** The JSON schema is the

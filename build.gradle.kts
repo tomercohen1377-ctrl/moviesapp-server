@@ -27,6 +27,10 @@ dependencies {
     implementation(libs.spring.boot.starter.validation)
     implementation(libs.spring.boot.starter.actuator)
 
+    // Spring Security — gives us BCryptPasswordEncoder, AuthenticationManager,
+    // and the request-security filter chain that we extend with our Bearer JWT filter.
+    implementation(libs.spring.boot.starter.security)
+
     // Kotlin reflection — required by Spring Data JPA to introspect
     // Kotlin entity classes (looks for primary constructors, parameter
     // names, default-value metadata). Without this you'll see
@@ -50,6 +54,11 @@ dependencies {
     // Flyway owns schema migrations before Hibernate validates entities.
     implementation(libs.flyway.core)
     runtimeOnly("org.flywaydb:flyway-database-postgresql:10.20.0")
+
+    // JJWT — RSA-signed bearer tokens (header + impl + jackson adapter).
+    implementation(libs.jjwt.api)
+    runtimeOnly(libs.jjwt.impl)
+    runtimeOnly(libs.jjwt.jackson)
 
     // Structured JSON logging for CloudWatch-friendly production logs.
     runtimeOnly("net.logstash.logback:logstash-logback-encoder:8.0")
