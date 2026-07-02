@@ -2,7 +2,6 @@ package com.tcohen.moviesapp.server.auth
 
 import com.tcohen.moviesapp.server.favorites.ErrorBody
 import jakarta.servlet.http.HttpServletRequest
-import kotlinx.serialization.Serializable
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
@@ -22,6 +21,11 @@ import org.springframework.web.bind.annotation.RestController
  * bootstraps the user (the first device signs up), and login exchanges
  * for a JWT. Everything else on the server requires `Authorization:
  * Bearer <jwt>`.
+ *
+ * Request/response shapes are Jackson-compatible Kotlin data classes —
+ * we don't reach for kotlinx.serialization here because Spring Boot's
+ * default Jackson+kotlin module is already on the classpath. Keeping
+ * the surface consistent avoids forcing two JSON converters.
  */
 @RestController
 @RequestMapping("/auth")
@@ -30,20 +34,22 @@ class AuthController(
     private val jwt: JwtService,
 ) {
 
-    @Serializable
     data class Credentials(val userId: String, val password: String)
 
-    @Serializable
     data class TokenResponse(
         val accessToken: String,
         val tokenType: String = "Bearer",
     )
 
+    data class JwksResponse(val keys: List<Map<String, Any?>>)
+
+    data class WhoAmIResponse(val userId: String)
+
     @PostMapping("/register")
     fun register(@RequestBody creds: Credentials): ResponseEntity<Any> =
         auth.register(creds.userId, creds.password)
             .fold(
-                onSuccess = { ResponseEntity.ok(TokenResponse(it)) },
+                onSuccess = { ResponseEntity.ok(TokenResponse(accessToken = it)) },
                 onFailure = { errorBody(it) },
             )
 
@@ -51,12 +57,12 @@ class AuthController(
     fun token(@RequestBody creds: Credentials): ResponseEntity<Any> =
         auth.login(creds.userId, creds.password)
             .fold(
-                onSuccess = { ResponseEntity.ok(TokenResponse(it)) },
+                onSuccess = { ResponseEntity.ok(TokenResponse(accessToken = it)) },
                 onFailure = { errorBody(it) },
             )
 
     @GetMapping("/jwks.json", produces = ["application/json"])
-    fun jwks(): Map<String, Any?> = mapOf("keys" to listOf(jwt.jwk()))
+    fun jwks(): JwksResponse = JwksResponse(keys = listOf(jwt.jwk()))
 
     /** Echo the bearer context back so callers can hit `/auth/whoami` for testing. */
     @GetMapping("/whoami")
@@ -64,7 +70,7 @@ class AuthController(
         val userId = request.getAttribute("userId") as? String
             ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(ErrorBody("Unauthorized"))
-        return ResponseEntity.ok(mapOf("userId" to userId))
+        return ResponseEntity.ok(WhoAmIResponse(userId = userId))
     }
 
     private fun errorBody(e: Throwable): ResponseEntity<Any> {
