@@ -136,15 +136,16 @@ app still starts if you're testing locally.
 > "one deployment file = one URL" experience. Option A is the most explicit
 > and least likely to confuse a reviewer.
 
-## 7. Set bcrypt-friendly environment variables
+## 7. Register your Android-side user
 
 The server uses bearer tokens now — there's no shared `API_KEY` to distribute
-to the Android client. **After deploying, register a user once**:
+to the Android client. **After deploying, register a user once** with two
+request headers (avoiding any JSON-body parsing ambiguity):
 
 ```powershell
 curl -X POST https://<your-domain>/auth/register \
-     -H "Content-Type: application/json" \
-     -d '{"userId":"you","password":"your-password-1234"}'
+     -H "X-User-Id: you" \
+     -H "X-Password: your-password-1234"
 # → {"accessToken":"eyJ…","tokenType":"Bearer"}
 ```
 
@@ -206,18 +207,18 @@ Wait ~30 seconds after `railway up` returned `Successful`, then:
 # Register a user, capture the JWT, hit a protected endpoint.
 $resp = & 'C:\Windows\System32\curl.exe' -sS -X POST `
    https://<your-railway-domain>/auth/register `
-   -H 'Content-Type: application/json' `
-   -d '{"userId":"smoke","password":"smoke-test-1234"}'
+   -H 'X-User-Id: smoke' `
+   -H 'X-Password: smoke-test-1234'
 $token = ($resp | ConvertFrom-Json).accessToken
 
 & 'C:\Windows\System32\curl.exe' -sS -H "Authorization: Bearer $token" `
-   https://<your-railway-domain>/users/me/favorites
+   https://<your-railway-domain>/users/smoke/favorites
 # → []
 ```
 
-If you see **401 "Invalid or expired token"** → your registered as a different
-user than the one you're calling `/users/.../favorites` with. JWTs are tied to
-the user that requested them.
+If you see **401 "Invalid or expired token"** → you registered as a different
+userId than the one you're calling `/users/.../favorites` with. JWTs are tied
+to the user that requested them.
 
 ## 11. Continuous deploy from GitHub
 

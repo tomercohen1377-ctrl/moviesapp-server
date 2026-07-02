@@ -100,14 +100,14 @@ curl -H "X-Api-Key: $API_KEY" https://<your-domain>/users/me/favorites
 
 ### Auth (open)
 
-| Method | Path                | Auth | Returns                              |
-| ------ | ------------------- | ---- | ------------------------------------ |
-| POST   | `/auth/register`    | No   | `200 { accessToken, tokenType }` |
-| POST   | `/auth/token`       | No   | `200 { accessToken, tokenType }` |
-| GET    | `/auth/jwks.json`   | No   | `200 { keys: [jwk] }`             |
-| GET    | `/auth/whoami`      | Yes  | `200 { userId }`                  |
-| GET    | `/health`           | No   | `200 { "status": "ok" }`         |
-| GET    | `/actuator/health`  | No   | `200 { "status": "UP" }`         |
+| Method | Path                | Auth | Returns                              | Inputs |
+| ------ | ------------------- | ---- | ------------------------------------ | ------ |
+| POST   | `/auth/register`    | No   | `200 { accessToken, tokenType }` | `X-User-Id`, `X-Password` headers |
+| POST   | `/auth/token`       | No   | `200 { accessToken, tokenType }` | `X-User-Id`, `X-Password` headers |
+| GET    | `/auth/jwks.json`   | No   | `200 { keys: [jwk] }`             | — |
+| GET    | `/auth/whoami`      | Yes  | `200 { userId }`                  | — |
+| GET    | `/health`           | No   | `200 { "status": "ok" }`         | — |
+| GET    | `/actuator/health`  | No   | `200 { "status": "UP" }`         | — |
 
 ### Favorites
 
