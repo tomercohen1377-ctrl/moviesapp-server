@@ -2,6 +2,7 @@ package com.tcohen.moviesapp.server.auth
 
 import com.tcohen.moviesapp.server.favorites.ErrorBody
 import jakarta.servlet.http.HttpServletRequest
+import kotlinx.serialization.Serializable
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
@@ -16,16 +17,16 @@ import org.springframework.web.bind.annotation.RestController
  * POST /auth/register   — create a user, return its first JWT
  * POST /auth/token      — login (username + password) → JWT
  * GET  /auth/jwks.json  — publish the public key as a JWK set
+ * GET  /auth/whoami     — echo the bearer subject as `userId` (debug)
  *
  * These endpoints are intentionally **unauthenticated**: registration
  * bootstraps the user (the first device signs up), and login exchanges
  * for a JWT. Everything else on the server requires `Authorization:
  * Bearer <jwt>`.
  *
- * Request/response shapes are Jackson-compatible Kotlin data classes —
- * we don't reach for kotlinx.serialization here because Spring Boot's
- * default Jackson+kotlin module is already on the classpath. Keeping
- * the surface consistent avoids forcing two JSON converters.
+ * DTOs use `kotlinx.serialization` (the same JSON library the Android
+ * client uses) so the wire shapes stay byte-identical between server
+ * response and Kotlin decoding in the app.
  */
 @RestController
 @RequestMapping("/auth")
@@ -34,15 +35,16 @@ class AuthController(
     private val jwt: JwtService,
 ) {
 
+    @Serializable
     data class Credentials(val userId: String, val password: String)
 
+    @Serializable
     data class TokenResponse(
         val accessToken: String,
         val tokenType: String = "Bearer",
     )
 
-    data class JwksResponse(val keys: List<Map<String, Any?>>)
-
+    @Serializable
     data class WhoAmIResponse(val userId: String)
 
     @PostMapping("/register")
@@ -62,7 +64,7 @@ class AuthController(
             )
 
     @GetMapping("/jwks.json", produces = ["application/json"])
-    fun jwks(): JwksResponse = JwksResponse(keys = listOf(jwt.jwk()))
+    fun jwks(): Map<String, Any?> = mapOf("keys" to listOf(jwt.jwk()))
 
     /** Echo the bearer context back so callers can hit `/auth/whoami` for testing. */
     @GetMapping("/whoami")
