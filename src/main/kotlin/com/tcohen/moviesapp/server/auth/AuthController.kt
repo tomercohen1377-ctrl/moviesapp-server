@@ -13,15 +13,17 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
 /**
- * POST /auth/register   — create a user, return its first JWT
- * POST /auth/token      — login (username + password) → JWT
- * GET  /auth/jwks.json  — publish the public key as a JWK set
- * GET  /auth/whoami     — echo the bearer subject as `userId` (debug)
+ * POST /auth/register   -- idempotent on userId; rotates password on repeat.
+ * POST /auth/token      -- login (username + password) -> JWT
+ * GET  /auth/jwks.json  -- publish the public key as a JWK set
+ * GET  /auth/whoami     -- echo the bearer subject as `userId` (debug)
  *
- * These endpoints are intentionally **unauthenticated**: registration
- * bootstraps the user (the first device signs up), and login exchanges
- * for a JWT. Everything else on the server requires `Authorization:
- * Bearer <jwt>`.
+ * `/auth/register` is intentionally **unauthenticated** — it both creates
+ * the user (first device) and re-authenticates a returning user (reinstalled
+ * client). The client's `userId` is the salted-hashed ANDROID_ID, which
+ * is stable across uninstalls; on reinstall the server sees the same
+ * userId, accepts the new password, and issues a fresh JWT. Everything
+ * else on the server requires `Authorization: Bearer <jwt>`.
  *
  * DTOs use `kotlinx.serialization` (the same JSON library the Android
  * client uses) so the wire shapes stay byte-identical between server
@@ -96,7 +98,6 @@ class AuthController(
     private fun errorBody(e: Throwable): ResponseEntity<Any> {
         val message = (e.message ?: e.javaClass.simpleName)
         val status = when (message) {
-            "UserAlreadyExists" -> HttpStatus.CONFLICT
             "InvalidCredentials" -> HttpStatus.UNAUTHORIZED
             else -> HttpStatus.BAD_REQUEST
         }
@@ -110,9 +111,7 @@ class AuthController(
      * Spring Boot problem-detail JSON. Lets us return our `ErrorBody` shape.
      */
     @org.springframework.web.bind.annotation.ExceptionHandler(Exception::class)
-    fun handle(e: Exception): ResponseEntity<Any> {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-            .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-            .body(ErrorBody("Unexpected error: ${e.javaClass.simpleName}: ${e.message ?: "<none>"}"))
-    }
+    fun handle(e: Exception): ResponseEntity<Any> = ResponseEntity.status(HttpStatus.BAD_REQUEST)
+        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+        .body(ErrorBody("Unexpected error: ${e.javaClass.simpleName}: ${e.message ?: "<none>"}"))
 }

@@ -17,7 +17,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
  *
  * Coverage:
  *   - `/auth/register` happy path returns JWT
- *   - `/auth/register` repeats the same user → 409 Conflict
+ *   - `/auth/register` repeats the same user → JWT (password rotated, no 409)
  *   - `/auth/token` happy path returns JWT
  *   - `/auth/token` wrong password → 401
  *   - `/auth/token` unknown user → 401
@@ -55,11 +55,17 @@ class AuthControllerTest {
     }
 
     @Test
-    fun `register duplicate returns 409`() {
+    fun `register duplicate is idempotent and rotates the password`() {
         mockMvc.perform(credsPost("u1", "password-1234")).andExpect(status().isOk)
         mockMvc.perform(credsPost("u1", "another-1234"))
-            .andExpect(status().isConflict)
-            .andExpect(jsonPath("$.error").value("UserAlreadyExists"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.accessToken").exists())
+            .andExpect(jsonPath("$.tokenType").value("Bearer"))
+
+        mockMvc.perform(tokenPost("u1", "another-1234"))
+            .andExpect(status().isOk)
+        mockMvc.perform(tokenPost("u1", "password-1234"))
+            .andExpect(status().isUnauthorized)
     }
 
     @Test
